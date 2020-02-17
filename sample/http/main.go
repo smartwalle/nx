@@ -8,8 +8,12 @@ import (
 )
 
 func main() {
-	nx.Serve(
-		&http.Server{Addr: ":9900", Handler: newHandler()},
+	nx.ServeWithOptions(
+		[]*http.Server{&http.Server{Addr: ":9900", Handler: newHandler()}},
+		nx.WithRestartHook(func() error {
+			fmt.Println("hahah")
+			return nil
+		}),
 	)
 }
 

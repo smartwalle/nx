@@ -24,35 +24,48 @@ var (
 	ppid       = os.Getppid()
 )
 
-type option func(*app)
+type option func(*HTTP)
 
-// An app contains one or more servers and associated configuration.
-type app struct {
-	servers         []*http.Server
-	http            *httpdown.HTTP
-	net             *gracenet.Net
-	listeners       []net.Listener
-	sds             []httpdown.Server
-	preStartProcess func() error
-	errors          chan error
+// WithRestartHook configures a callback to trigger during graceful restart
+// directly before starting the successor process. This allows the current
+// process to release holds on resources that the new process will need.
+func WithRestartHook(hook func() error) option {
+	return func(h *HTTP) {
+		h.restartProcess = hook
+	}
 }
 
-func newApp(servers []*http.Server) *app {
-	return &app{
+// An HTTP contains one or more servers and associated configuration.
+type HTTP struct {
+	servers        []*http.Server
+	http           *httpdown.HTTP
+	net            *gracenet.Net
+	listeners      []net.Listener
+	sds            []httpdown.Server
+	restartProcess func() error
+	errors         chan error
+}
+
+func NewHTTP(servers []*http.Server, options ...option) *HTTP {
+	var h = &HTTP{
 		servers:   servers,
 		http:      &httpdown.HTTP{},
 		net:       &gracenet.Net{},
 		listeners: make([]net.Listener, 0, len(servers)),
 		sds:       make([]httpdown.Server, 0, len(servers)),
 
-		preStartProcess: func() error { return nil },
+		restartProcess: func() error { return nil },
 		// 2x num servers for possible Close or Stop errors + 1 for possible
 		// StartProcess error.
 		errors: make(chan error, 1+(len(servers)*2)),
 	}
+	for _, opt := range options {
+		opt(h)
+	}
+	return h
 }
 
-func (a *app) listen() error {
+func (a *HTTP) listen() error {
 	for _, s := range a.servers {
 		// TODO: default addresses
 		l, err := a.net.Listen("tcp", s.Addr)
@@ -67,13 +80,13 @@ func (a *app) listen() error {
 	return nil
 }
 
-func (a *app) serve() {
+func (a *HTTP) serve() {
 	for i, s := range a.servers {
 		a.sds = append(a.sds, a.http.Serve(s, a.listeners[i]))
 	}
 }
 
-func (a *app) wait() {
+func (a *HTTP) wait() {
 	var wg sync.WaitGroup
 	wg.Add(len(a.sds) * 2) // Wait & Stop
 	go a.signalHandler(&wg)
@@ -88,7 +101,7 @@ func (a *app) wait() {
 	wg.Wait()
 }
 
-func (a *app) term(wg *sync.WaitGroup) {
+func (a *HTTP) term(wg *sync.WaitGroup) {
 	for _, s := range a.sds {
 		go func(s httpdown.Server) {
 			defer wg.Done()
@@ -99,7 +112,7 @@ func (a *app) term(wg *sync.WaitGroup) {
 	}
 }
 
-func (a *app) signalHandler(wg *sync.WaitGroup) {
+func (a *HTTP) signalHandler(wg *sync.WaitGroup) {
 	ch := make(chan os.Signal, 10)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2)
 	for {
@@ -112,7 +125,7 @@ func (a *app) signalHandler(wg *sync.WaitGroup) {
 			a.term(wg)
 			return
 		case syscall.SIGUSR2:
-			err := a.preStartProcess()
+			err := a.restartProcess()
 			if err != nil {
 				a.errors <- err
 			}
@@ -125,7 +138,7 @@ func (a *app) signalHandler(wg *sync.WaitGroup) {
 	}
 }
 
-func (a *app) run() error {
+func (a *HTTP) Run() error {
 	// Acquire Listeners
 	if err := a.listen(); err != nil {
 		return err
@@ -177,29 +190,17 @@ func (a *app) run() error {
 }
 
 // ServeWithOptions does the same as Serve, but takes a set of options to
-// configure the app struct.
+// configure the HTTP struct.
 func ServeWithOptions(servers []*http.Server, options ...option) error {
-	a := newApp(servers)
-	for _, opt := range options {
-		opt(a)
-	}
-	return a.run()
+	var h = NewHTTP(servers, options...)
+	return h.Run()
 }
 
 // Serve will serve the given http.Servers and will monitor for signals
 // allowing for graceful termination (SIGTERM) or restart (SIGUSR2).
 func Serve(servers ...*http.Server) error {
-	a := newApp(servers)
-	return a.run()
-}
-
-// PreStartProcess configures a callback to trigger during graceful restart
-// directly before starting the successor process. This allows the current
-// process to release holds on resources that the new process will need.
-func PreStartProcess(hook func() error) option {
-	return func(a *app) {
-		a.preStartProcess = hook
-	}
+	var h = NewHTTP(servers)
+	return h.Run()
 }
 
 // Used for pretty printing addresses.
