@@ -12,8 +12,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/smartwalle/nx/clock"
 )
 
 const (
@@ -49,10 +47,6 @@ type HTTP struct {
 	// number of client connections exist and closing them can take a long time.
 	// Note, this is in addition to the StopTimeout. Defaults to 1 minute.
 	KillTimeout time.Duration
-
-	// Clock allows for testing timing related functionality. Do not specify this
-	// in production code.
-	Clock clock.Clock
 }
 
 // Serve provides the low-level API which is useful if you're creating your own
@@ -66,15 +60,10 @@ func (h HTTP) Serve(s *http.Server, l net.Listener) Server {
 	if killTimeout == 0 {
 		killTimeout = defaultKillTimeout
 	}
-	klock := h.Clock
-	if klock == nil {
-		klock = clock.New()
-	}
 
 	ss := &server{
 		stopTimeout:  stopTimeout,
 		killTimeout:  killTimeout,
-		clock:        klock,
 		oldConnState: s.ConnState,
 		listener:     l,
 		server:       s,
@@ -120,7 +109,6 @@ func (h HTTP) ListenAndServe(s *http.Server) (Server, error) {
 type server struct {
 	stopTimeout time.Duration
 	killTimeout time.Duration
-	clock       clock.Clock
 
 	oldConnState func(net.Conn, http.ConnState)
 	server       *http.Server
@@ -279,13 +267,13 @@ func (s *server) Stop() error {
 		// wait for stop
 		select {
 		case <-stopDone:
-		case <-s.clock.After(s.stopTimeout):
+		case <-time.After(s.stopTimeout):
 			// stop timed out, wait for kill
 			killDone := make(chan struct{})
 			s.kill <- killDone
 			select {
 			case <-killDone:
-			case <-s.clock.After(s.killTimeout):
+			case <-time.After(s.killTimeout):
 				// kill timed out, give up
 			}
 		}
