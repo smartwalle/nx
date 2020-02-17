@@ -5,7 +5,6 @@ import (
 	"github.com/smartwalle/nx"
 	"net/http"
 	"os"
-	"time"
 )
 
 func main() {
