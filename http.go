@@ -169,9 +169,9 @@ func (a *HTTP) Run() error {
 		}
 	}
 
-	waitdone := make(chan struct{})
+	waitDone := make(chan struct{})
 	go func() {
-		defer close(waitdone)
+		defer close(waitDone)
 		a.wait()
 	}()
 
@@ -181,7 +181,7 @@ func (a *HTTP) Run() error {
 			panic("unexpected nil error")
 		}
 		return err
-	case <-waitdone:
+	case <-waitDone:
 		if logger != nil {
 			logger.Printf("Exiting pid %d.", os.Getpid())
 		}
