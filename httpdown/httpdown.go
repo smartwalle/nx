@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/smartwalle/nx/clock"
-	"github.com/smartwalle/nx/stats"
 )
 
 const (
@@ -51,9 +50,6 @@ type HTTP struct {
 	// Note, this is in addition to the StopTimeout. Defaults to 1 minute.
 	KillTimeout time.Duration
 
-	// Stats is optional. If provided, it will be used to record various metrics.
-	Stats stats.Client
-
 	// Clock allows for testing timing related functionality. Do not specify this
 	// in production code.
 	Clock clock.Clock
@@ -78,7 +74,6 @@ func (h HTTP) Serve(s *http.Server, l net.Listener) Server {
 	ss := &server{
 		stopTimeout:  stopTimeout,
 		killTimeout:  killTimeout,
-		stats:        h.Stats,
 		clock:        klock,
 		oldConnState: s.ConnState,
 		listener:     l,
@@ -113,7 +108,6 @@ func (h HTTP) ListenAndServe(s *http.Server) (Server, error) {
 	}
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		stats.BumpSum(h.Stats, "listen.error", 1)
 		return nil, err
 	}
 	if s.TLSConfig != nil {
@@ -126,7 +120,6 @@ func (h HTTP) ListenAndServe(s *http.Server) (Server, error) {
 type server struct {
 	stopTimeout time.Duration
 	killTimeout time.Duration
-	stats       stats.Client
 	clock       clock.Clock
 
 	oldConnState func(net.Conn, http.ConnState)
@@ -193,21 +186,8 @@ func (s *server) manage() {
 		}
 	}
 
-	// setup a ticker to report various values every minute. if we don't have a
-	// Stats implementation provided, we Stop it so it never ticks.
-	statsTicker := s.clock.Ticker(time.Minute)
-	if s.stats == nil {
-		statsTicker.Stop()
-	}
-
 	for {
 		select {
-		case <-statsTicker.C:
-			// we'll only get here when s.stats is not nil
-			s.stats.BumpAvg("http-state.new", countNew)
-			s.stats.BumpAvg("http-state.active", countActive)
-			s.stats.BumpAvg("http-state.idle", countIdle)
-			s.stats.BumpAvg("http-state.total", countNew+countActive+countIdle)
 		case c := <-s.new:
 			conns[c] = http.StateNew
 			countNew++
@@ -227,7 +207,6 @@ func (s *server) manage() {
 				c.Close()
 			}
 		case c := <-s.closed:
-			stats.BumpSum(s.stats, "conn.closed", 1)
 			decConn(c)
 			delete(conns, c)
 
@@ -256,7 +235,6 @@ func (s *server) manage() {
 
 		case killDone := <-s.kill:
 			// force close all connections
-			stats.BumpSum(s.stats, "kill.conn.count", float64(len(conns)))
 			for c := range conns {
 				c.Close()
 			}
@@ -273,7 +251,6 @@ func (s *server) manage() {
 }
 
 func (s *server) serve() {
-	stats.BumpSum(s.stats, "serve", 1)
 	s.serveErr <- s.server.Serve(s.listener)
 	close(s.serveDone)
 	close(s.serveErr)
@@ -288,9 +265,6 @@ func (s *server) Wait() error {
 
 func (s *server) Stop() error {
 	s.stopOnce.Do(func() {
-		defer stats.BumpTime(s.stats, "stop.time").End()
-		stats.BumpSum(s.stats, "stop", 1)
-
 		// first disable keep-alive for new connections
 		s.server.SetKeepAlivesEnabled(false)
 
@@ -306,9 +280,6 @@ func (s *server) Stop() error {
 		select {
 		case <-stopDone:
 		case <-s.clock.After(s.stopTimeout):
-			defer stats.BumpTime(s.stats, "kill.time").End()
-			stats.BumpSum(s.stats, "kill", 1)
-
 			// stop timed out, wait for kill
 			killDone := make(chan struct{})
 			s.kill <- killDone
@@ -316,12 +287,10 @@ func (s *server) Stop() error {
 			case <-killDone:
 			case <-s.clock.After(s.killTimeout):
 				// kill timed out, give up
-				stats.BumpSum(s.stats, "kill.timeout", 1)
 			}
 		}
 
 		if closeErr != nil && !isUseOfClosedError(closeErr) {
-			stats.BumpSum(s.stats, "listener.close.error", 1)
 			s.stopErr = closeErr
 		}
 	})

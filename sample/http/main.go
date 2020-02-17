@@ -11,7 +11,7 @@ func main() {
 	nx.ServeWithOptions(
 		[]*http.Server{&http.Server{Addr: ":9900", Handler: newHandler()}},
 		nx.WithRestartHook(func() error {
-			fmt.Println("hahah")
+			fmt.Println("Restart")
 			return nil
 		}),
 	)
