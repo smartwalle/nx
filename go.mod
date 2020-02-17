@@ -1,3 +1,3 @@
-module github.com/smartwalle/ng
+module github.com/smartwalle/nx
 
 go 1.13

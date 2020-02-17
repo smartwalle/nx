@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/smartwalle/ng/gracehttp"
+	"github.com/smartwalle/nx"
 	"net/http"
 	"os"
 )
 
 func main() {
-	gracehttp.Serve(
+	nx.Serve(
 		&http.Server{Addr: ":9900", Handler: newHandler()},
 	)
 }

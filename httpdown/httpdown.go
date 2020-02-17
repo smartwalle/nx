@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/smartwalle/ng/clock"
-	"github.com/smartwalle/ng/stats"
+	"github.com/smartwalle/nx/clock"
+	"github.com/smartwalle/nx/stats"
 )
 
 const (
