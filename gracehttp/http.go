@@ -14,8 +14,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/facebookgo/grace/gracenet"
-	"github.com/facebookgo/httpdown"
+	"github.com/smartwalle/ng/gracenet"
+	"github.com/smartwalle/ng/httpdown"
 )
 
 var (
