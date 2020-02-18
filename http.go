@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -19,48 +18,50 @@ import (
 )
 
 var (
-	logger     *log.Logger
 	didInherit = os.Getenv("LISTEN_FDS") != ""
 	ppid       = os.Getppid()
 )
 
-type option func(*HTTP)
+type options struct {
+	restartProcess func() error
+}
+
+type option func(*options)
 
 // WithRestartHook configures a callback to trigger during graceful restart
 // directly before starting the successor process. This allows the current
 // process to release holds on resources that the new process will need.
 func WithRestartHook(hook func() error) option {
-	return func(h *HTTP) {
-		h.restartProcess = hook
+	return func(opts *options) {
+		opts.restartProcess = hook
 	}
 }
 
 // An HTTP contains one or more servers and associated configuration.
 type HTTP struct {
-	servers        []*http.Server
-	http           *httpdown.HTTP
-	net            *gracenet.Net
-	listeners      []net.Listener
-	sds            []httpdown.Server
-	restartProcess func() error
-	errors         chan error
+	*options
+	servers   []*http.Server
+	http      *httpdown.HTTP
+	net       *gracenet.Net
+	listeners []net.Listener
+	sds       []httpdown.Server
+	errors    chan error
 }
 
-func NewHTTP(servers []*http.Server, options ...option) *HTTP {
+func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 	var h = &HTTP{
+		options:   &options{restartProcess: func() error { return nil }},
 		servers:   servers,
 		http:      &httpdown.HTTP{},
 		net:       &gracenet.Net{},
 		listeners: make([]net.Listener, 0, len(servers)),
 		sds:       make([]httpdown.Server, 0, len(servers)),
-
-		restartProcess: func() error { return nil },
 		// 2x num servers for possible Close or Stop errors + 1 for possible
 		// StartProcess error.
 		errors: make(chan error, 1+(len(servers)*2)),
 	}
-	for _, opt := range options {
-		opt(h)
+	for _, opt := range opts {
+		opt(h.options)
 	}
 	return h
 }
@@ -213,9 +214,4 @@ func pprintAddr(listeners []net.Listener) []byte {
 		fmt.Fprint(&out, l.Addr())
 	}
 	return out.Bytes()
-}
-
-// SetLogger sets logger to be able to grab some useful logs
-func SetLogger(l *log.Logger) {
-	logger = l
 }

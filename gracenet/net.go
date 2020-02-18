@@ -168,13 +168,13 @@ func (n *Net) ListenUnix(nett string, laddr *net.UnixAddr) (*net.UnixListener, e
 	return l, nil
 }
 
-// activeListeners returns a snapshot copy of the active listeners.
-func (n *Net) activeListeners() ([]net.Listener, error) {
+// ActiveListeners returns a snapshot copy of the active listeners.
+func (n *Net) ActiveListeners() []net.Listener {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 	ls := make([]net.Listener, len(n.active))
 	copy(ls, n.active)
-	return ls, nil
+	return ls
 }
 
 func isSameAddr(a1, a2 net.Addr) bool {
@@ -204,10 +204,9 @@ func isSameAddr(a1, a2 net.Addr) bool {
 // deployed binary to be started. It returns the pid of the newly started
 // process when successful.
 func (n *Net) StartProcess() (int, error) {
-	listeners, err := n.activeListeners()
-	if err != nil {
-		return 0, err
-	}
+	listeners := n.ActiveListeners()
+
+	var err error
 
 	// Extract the fds from the listeners.
 	files := make([]*os.File, len(listeners))
