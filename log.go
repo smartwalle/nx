@@ -1,4 +1,4 @@
-package nx
+package grace
 
 import (
 	"log"
@@ -24,7 +24,7 @@ func SetLogger(l Logger) {
 		l = &nilLogger{}
 	}
 	if l.Prefix() == "" {
-		l.SetPrefix("[nx] ")
+		l.SetPrefix("[grace] ")
 	}
 	logger = l
 }

@@ -1,8 +1,8 @@
-package nx
+package grace
 
 import (
 	"fmt"
-	"github.com/smartwalle/nx/gracenet"
+	"github.com/smartwalle/grace/gracenet"
 	"net"
 	"os"
 	"os/signal"

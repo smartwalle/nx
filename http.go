@@ -1,6 +1,6 @@
 // Package gracehttp provides easy to use graceful restart
 // functionality for HTTP server.
-package nx
+package grace
 
 import (
 	"bytes"
@@ -13,8 +13,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/smartwalle/nx/gracenet"
-	"github.com/smartwalle/nx/httpdown"
+	"github.com/smartwalle/grace/gracenet"
+	"github.com/smartwalle/grace/httpdown"
 )
 
 var (
