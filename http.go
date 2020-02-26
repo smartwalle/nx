@@ -20,17 +20,17 @@ var (
 )
 
 type options struct {
-	restartProcess func() error
+	restartHandler func() error
 }
 
 type option func(*options)
 
-// WithRestartHook configures a callback to trigger during graceful restart
+// WithRestartHandler configures a callback to trigger during graceful restart
 // directly before starting the successor process. This allows the current
 // process to release holds on resources that the new process will need.
-func WithRestartHook(hook func() error) option {
+func WithRestartHandler(handler func() error) option {
 	return func(opts *options) {
-		opts.restartProcess = hook
+		opts.restartHandler = handler
 	}
 }
 
@@ -47,7 +47,7 @@ type HTTP struct {
 
 func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 	var h = &HTTP{
-		options:   &options{restartProcess: func() error { return nil }},
+		options:   &options{restartHandler: func() error { return nil }},
 		servers:   servers,
 		http:      &httpdown.HTTP{},
 		net:       &gracenet.Net{},

@@ -23,7 +23,7 @@ func (a *HTTP) signalHandler(wg *sync.WaitGroup) {
 			a.term(wg)
 			return
 		case syscall.SIGUSR2:
-			err := a.restartProcess()
+			err := a.restartHandler()
 			if err != nil {
 				a.errors <- err
 			}

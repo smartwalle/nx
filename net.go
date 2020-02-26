@@ -18,7 +18,7 @@ type Net struct {
 
 func NewNet(opts ...option) *Net {
 	var n = &Net{
-		options:  &options{restartProcess: func() error { return nil }},
+		options:  &options{restartHandler: func() error { return nil }},
 		conns:    make(map[net.Conn]struct{}),
 		net:      &gracenet.Net{},
 		termChan: make(chan struct{}, 1),
