@@ -4,10 +4,10 @@ package grace
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/smartwalle/grace/gracenet"
-	"github.com/smartwalle/grace/httpdown"
 	"net"
 	"net/http"
 	"os"
@@ -38,10 +38,8 @@ func WithRestartHandler(handler func() error) option {
 type HTTP struct {
 	*options
 	servers   []*http.Server
-	http      *httpdown.HTTP
 	net       *gracenet.Net
 	listeners []net.Listener
-	sds       []httpdown.Server
 	errors    chan error
 }
 
@@ -49,13 +47,9 @@ func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 	var h = &HTTP{
 		options:   &options{restartHandler: func() error { return nil }},
 		servers:   servers,
-		http:      &httpdown.HTTP{},
 		net:       &gracenet.Net{},
 		listeners: make([]net.Listener, 0, len(servers)),
-		sds:       make([]httpdown.Server, 0, len(servers)),
-		// 2x num servers for possible Close or Stop errors + 1 for possible
-		// StartProcess error.
-		errors: make(chan error, 1+(len(servers)*2)),
+		errors:    make(chan error, 1+(len(servers)*2)),
 	}
 	for _, opt := range opts {
 		opt(h.options)
@@ -65,7 +59,6 @@ func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 
 func (a *HTTP) listen() error {
 	for _, s := range a.servers {
-		// TODO: default addresses
 		l, err := a.net.Listen("tcp", s.Addr)
 		if err != nil {
 			return err
@@ -80,30 +73,27 @@ func (a *HTTP) listen() error {
 
 func (a *HTTP) serve() {
 	for i, s := range a.servers {
-		a.sds = append(a.sds, a.http.Serve(s, a.listeners[i]))
+		go s.Serve(a.listeners[i])
 	}
 }
 
 func (a *HTTP) wait() {
 	var wg sync.WaitGroup
-	wg.Add(len(a.sds) * 2) // Wait & Stop
+	wg.Add(len(a.servers) * 2) // Wait & Stop
 	go a.signalHandler(&wg)
-	for _, s := range a.sds {
-		go func(s httpdown.Server) {
+	for _, s := range a.servers {
+		s.RegisterOnShutdown(func() {
 			defer wg.Done()
-			if err := s.Wait(); err != nil {
-				a.errors <- err
-			}
-		}(s)
+		})
 	}
 	wg.Wait()
 }
 
 func (a *HTTP) term(wg *sync.WaitGroup) {
-	for _, s := range a.sds {
-		go func(s httpdown.Server) {
+	for _, s := range a.servers {
+		go func(s *http.Server) {
 			defer wg.Done()
-			if err := s.Stop(); err != nil {
+			if err := s.Shutdown(context.Background()); err != nil {
 				a.errors <- err
 			}
 		}(s)
