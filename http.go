@@ -37,6 +37,7 @@ func WithRestartHandler(handler func() error) option {
 // An HTTP contains one or more servers and associated configuration.
 type HTTP struct {
 	*options
+	wg        *sync.WaitGroup
 	servers   []*http.Server
 	net       *gracenet.Net
 	listeners []net.Listener
@@ -46,6 +47,7 @@ type HTTP struct {
 func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 	var h = &HTTP{
 		options:   &options{restartHandler: func() error { return nil }},
+		wg:        &sync.WaitGroup{},
 		servers:   servers,
 		net:       &gracenet.Net{},
 		listeners: make([]net.Listener, 0, len(servers)),
@@ -78,15 +80,16 @@ func (a *HTTP) serve() {
 }
 
 func (a *HTTP) wait() {
-	var wg sync.WaitGroup
+	var wg = &sync.WaitGroup{}
 	wg.Add(len(a.servers) * 2) // Wait & Stop
-	go a.signalHandler(&wg)
+	go a.signalHandler(wg)
 	for _, s := range a.servers {
 		s.RegisterOnShutdown(func() {
 			defer wg.Done()
 		})
 	}
 	wg.Wait()
+	a.wg.Wait()
 }
 
 func (a *HTTP) term(wg *sync.WaitGroup) {
@@ -98,6 +101,14 @@ func (a *HTTP) term(wg *sync.WaitGroup) {
 			}
 		}(s)
 	}
+}
+
+func (a *HTTP) Retain() {
+	a.wg.Add(1)
+}
+
+func (a *HTTP) Done() {
+	a.wg.Done()
 }
 
 // ServeWithOptions does the same as Serve, but takes a set of options to
