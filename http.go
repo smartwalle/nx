@@ -24,8 +24,8 @@ type Waiter interface {
 }
 
 type options struct {
-	restartHandler func() error
-	waiter         Waiter
+	restart func() error
+	waiter  Waiter
 }
 
 type option func(*options)
@@ -35,7 +35,7 @@ type option func(*options)
 // process to release holds on resources that the new process will need.
 func WithRestart(handler func() error) option {
 	return func(opts *options) {
-		opts.restartHandler = handler
+		opts.restart = handler
 	}
 }
 
@@ -56,7 +56,7 @@ type HTTP struct {
 
 func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 	var h = &HTTP{
-		options:   &options{restartHandler: func() error { return nil }},
+		options:   &options{restart: func() error { return nil }},
 		servers:   servers,
 		net:       &gracenet.Net{},
 		listeners: make([]net.Listener, 0, len(servers)),

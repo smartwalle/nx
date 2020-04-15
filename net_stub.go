@@ -28,7 +28,7 @@ func (n *Net) signalHandler() {
 			close(n.termChan)
 			return
 		case syscall.SIGUSR2:
-			err := n.restartHandler()
+			err := n.restart()
 			if err != nil {
 				n.errChan <- err
 			}
