@@ -210,12 +210,17 @@ func (n *Net) StartProcess() (int, error) {
 
 	// Extract the fds from the listeners.
 	files := make([]*os.File, len(listeners))
+	defer func() {
+		for _, file := range files {
+			file.Close()
+		}
+	}()
+
 	for i, l := range listeners {
 		files[i], err = l.(filer).File()
 		if err != nil {
 			return 0, err
 		}
-		defer files[i].Close()
 	}
 
 	// Use the original binary location. This works with symlinks such that if
