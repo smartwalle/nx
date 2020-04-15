@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-func (a *HTTP) signalHandler(wg *sync.WaitGroup) {
+func (h *HTTP) signalHandler(wg *sync.WaitGroup) {
 	ch := make(chan os.Signal, 10)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	for {
@@ -19,30 +19,30 @@ func (a *HTTP) signalHandler(wg *sync.WaitGroup) {
 			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
 			// terminating.
 			signal.Stop(ch)
-			a.term(wg)
+			h.term(wg)
 		}
 	}
 }
 
-func (a *HTTP) Run() error {
-	if err := a.listen(); err != nil {
+func (h *HTTP) Run() error {
+	if err := h.listen(); err != nil {
 		return err
 	}
 
-	for i, s := range a.servers {
-		a.sds = append(a.sds, a.http.Serve(s, a.listeners[i]))
+	for i, s := range h.servers {
+		go s.Serve(h.listeners[i])
 	}
 
-	a.serve()
+	h.serve()
 
 	waitDone := make(chan struct{})
 	go func() {
 		defer close(waitDone)
-		a.wait()
+		h.wait()
 	}()
 
 	select {
-	case err := <-a.errors:
+	case err := <-h.errors:
 		if err == nil {
 			panic("unexpected nil error")
 		}

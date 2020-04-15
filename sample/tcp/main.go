@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"github.com/smartwalle/grace"
+	"sync"
 	"time"
 )
 
 func main() {
-	var n = grace.NewNet()
+	var w = &sync.WaitGroup{}
+	var n = grace.NewNet(grace.WithWait(w))
 	ln, err := n.Listen("tcp", ":8891")
 	if err != nil {
 		fmt.Println(err)
@@ -21,13 +23,13 @@ func main() {
 			return
 		}
 
-		n.Retain()
+		w.Add(1)
 		go func() {
 			for i := 0; i < 100; i++ {
 				fmt.Println(conn.Write([]byte("hello")))
 				time.Sleep(time.Second * 1)
 			}
-			n.Done()
+			w.Done()
 		}()
 	}()
 
