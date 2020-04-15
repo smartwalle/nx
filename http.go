@@ -90,13 +90,13 @@ func (h *HTTP) serve() {
 
 func (h *HTTP) wait() {
 	var wg = &sync.WaitGroup{}
-	wg.Add(len(h.servers) * 2) // Wait & Stop
+	wg.Add(len(h.servers)) // Wait & Stop
 	go h.signalHandler(wg)
-	for _, s := range h.servers {
-		s.RegisterOnShutdown(func() {
-			defer wg.Done()
-		})
-	}
+	//for _, s := range h.servers {
+	//	s.RegisterOnShutdown(func() {
+	//		defer wg.Done()
+	//	})
+	//}
 	wg.Wait()
 	if h.waiter != nil {
 		h.waiter.Wait()
