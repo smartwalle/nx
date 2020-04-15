@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/smartwalle/grace"
+	"time"
 )
 
 func main() {
 	var n = grace.NewNet()
-	ln, err := n.Listen("tcp", ":8899")
+	ln, err := n.Listen("tcp", ":8891")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -19,11 +20,14 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		n.AddConn(conn)
 
+		n.Retain()
 		go func() {
-			conn.Write([]byte("hello"))
-			n.RemoveConn(conn)
+			for i := 0; i < 100; i++ {
+				fmt.Println(conn.Write([]byte("hello")))
+				time.Sleep(time.Second * 1)
+			}
+			n.Done()
 		}()
 	}()
 

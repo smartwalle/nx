@@ -4,13 +4,11 @@ import (
 	"github.com/smartwalle/grace/gracenet"
 	"net"
 	"sync"
-	"time"
 )
 
 type Net struct {
 	*options
-	mu       sync.Mutex
-	conns    map[net.Conn]struct{}
+	wg       *sync.WaitGroup
 	net      *gracenet.Net
 	termChan chan struct{}
 	errChan  chan error
@@ -19,7 +17,7 @@ type Net struct {
 func NewNet(opts ...option) *Net {
 	var n = &Net{
 		options:  &options{restartHandler: func() error { return nil }},
-		conns:    make(map[net.Conn]struct{}),
+		wg:       &sync.WaitGroup{},
 		net:      &gracenet.Net{},
 		termChan: make(chan struct{}, 1),
 		errChan:  make(chan error, 1),
@@ -42,20 +40,12 @@ func (n *Net) ListenUnix(nett string, laddr *net.UnixAddr) (*net.UnixListener, e
 	return n.net.ListenUnix(nett, laddr)
 }
 
-func (n *Net) AddConn(c net.Conn) {
-	if c != nil {
-		n.mu.Lock()
-		n.conns[c] = struct{}{}
-		n.mu.Unlock()
-	}
+func (n *Net) Retain() {
+	n.wg.Add(1)
 }
 
-func (n *Net) RemoveConn(c net.Conn) {
-	if c != nil {
-		n.mu.Lock()
-		delete(n.conns, c)
-		n.mu.Unlock()
-	}
+func (n *Net) Done() {
+	n.wg.Done()
 }
 
 func (n *Net) wait() {
@@ -63,15 +53,6 @@ func (n *Net) wait() {
 
 	select {
 	case <-n.termChan:
-		for {
-			n.mu.Lock()
-			var connLen = len(n.conns)
-			n.mu.Unlock()
-
-			if connLen == 0 {
-				break
-			}
-			time.Sleep(time.Second * 2)
-		}
+		n.wg.Wait()
 	}
 }
