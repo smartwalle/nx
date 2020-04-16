@@ -11,7 +11,7 @@ import (
 func main() {
 	grace.ServeWithOptions(
 		[]*http.Server{{Addr: ":9900", Handler: newHandler()}},
-		grace.WithRestart(func() error {
+		grace.WithRestartHandler(func() error {
 			fmt.Println("Restart")
 			return nil
 		}),

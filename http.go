@@ -30,10 +30,10 @@ type options struct {
 
 type option func(*options)
 
-// WithRestart configures a callback to trigger during graceful restart
+// WithRestartHandler configures a callback to trigger during graceful restart
 // directly before starting the successor process. This allows the current
 // process to release holds on resources that the new process will need.
-func WithRestart(handler func() error) option {
+func WithRestartHandler(handler func() error) option {
 	return func(opts *options) {
 		opts.restart = handler
 	}
