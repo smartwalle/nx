@@ -5,11 +5,10 @@ package grace
 import (
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 )
 
-func (h *HTTP) signalHandler(wg *sync.WaitGroup) {
+func (h *HTTP) signalHandler() {
 	ch := make(chan os.Signal, 10)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	for {
@@ -19,7 +18,7 @@ func (h *HTTP) signalHandler(wg *sync.WaitGroup) {
 			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
 			// terminating.
 			signal.Stop(ch)
-			h.term(wg)
+			h.term()
 		}
 	}
 }

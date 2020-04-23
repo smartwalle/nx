@@ -16,13 +16,7 @@ func (n *Net) signalHandler() {
 		switch sig {
 		case syscall.SIGINT, syscall.SIGTERM:
 			signal.Stop(ch)
-			var lns = n.net.ActiveListeners()
-			for _, ln := range lns {
-				if err := ln.Close(); err != nil {
-					n.errChan <- err
-				}
-			}
-			close(n.termChan)
+			n.term()
 			return
 		}
 	}

@@ -19,13 +19,9 @@ var (
 	ppid       = os.Getppid()
 )
 
-type Waiter interface {
-	Wait()
-}
-
 type options struct {
 	restart func() error
-	waiter  Waiter
+	wg      *sync.WaitGroup
 }
 
 type option func(*options)
@@ -39,9 +35,9 @@ func WithRestartHandler(handler func() error) option {
 	}
 }
 
-func WithWait(w Waiter) option {
+func WithWait(w *sync.WaitGroup) option {
 	return func(opts *options) {
-		opts.waiter = w
+		opts.wg = w
 	}
 }
 
@@ -64,6 +60,9 @@ func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 	}
 	for _, opt := range opts {
 		opt(h.options)
+	}
+	if h.wg == nil {
+		h.wg = &sync.WaitGroup{}
 	}
 	return h
 }
@@ -89,24 +88,15 @@ func (h *HTTP) serve() {
 }
 
 func (h *HTTP) wait() {
-	var wg = &sync.WaitGroup{}
-	wg.Add(len(h.servers)) // Wait & Stop
-	go h.signalHandler(wg)
-	//for _, s := range h.servers {
-	//	s.RegisterOnShutdown(func() {
-	//		defer wg.Done()
-	//	})
-	//}
-	wg.Wait()
-	if h.waiter != nil {
-		h.waiter.Wait()
-	}
+	h.wg.Add(len(h.servers))
+	go h.signalHandler()
+	h.wg.Wait()
 }
 
-func (h *HTTP) term(wg *sync.WaitGroup) {
+func (h *HTTP) term() {
 	for _, s := range h.servers {
 		go func(s *http.Server) {
-			defer wg.Done()
+			defer h.wg.Done()
 			if err := s.Shutdown(context.Background()); err != nil {
 				h.errors <- err
 			}

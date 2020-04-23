@@ -3,24 +3,26 @@ package grace
 import (
 	"github.com/smartwalle/grace/gracenet"
 	"net"
+	"sync"
 )
 
 type Net struct {
 	*options
-	net      *gracenet.Net
-	termChan chan struct{}
-	errChan  chan error
+	net     *gracenet.Net
+	errChan chan error
 }
 
 func NewNet(opts ...option) *Net {
 	var n = &Net{
-		options:  &options{restart: func() error { return nil }},
-		net:      &gracenet.Net{},
-		termChan: make(chan struct{}, 1),
-		errChan:  make(chan error, 1),
+		options: &options{restart: func() error { return nil }},
+		net:     &gracenet.Net{},
+		errChan: make(chan error, 1),
 	}
 	for _, opt := range opts {
 		opt(n.options)
+	}
+	if n.wg == nil {
+		n.wg = &sync.WaitGroup{}
 	}
 	return n
 }
@@ -38,12 +40,19 @@ func (n *Net) ListenUnix(nett string, laddr *net.UnixAddr) (*net.UnixListener, e
 }
 
 func (n *Net) wait() {
+	n.wg.Add(len(n.net.ActiveListeners()))
 	go n.signalHandler()
+	n.wg.Wait()
+}
 
-	select {
-	case <-n.termChan:
-		if n.waiter != nil {
-			n.waiter.Wait()
-		}
+func (n *Net) term() {
+	var lns = n.net.ActiveListeners()
+	for _, ln := range lns {
+		go func(ln net.Listener) {
+			defer n.wg.Done()
+			if err := ln.Close(); err != nil {
+				n.errChan <- err
+			}
+		}(ln)
 	}
 }

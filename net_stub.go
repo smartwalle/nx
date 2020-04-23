@@ -19,13 +19,7 @@ func (n *Net) signalHandler() {
 			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
 			// terminating.
 			signal.Stop(ch)
-			var lns = n.net.ActiveListeners()
-			for _, ln := range lns {
-				if err := ln.Close(); err != nil {
-					n.errChan <- err
-				}
-			}
-			close(n.termChan)
+			n.term()
 			return
 		case syscall.SIGUSR2:
 			err := n.restart()

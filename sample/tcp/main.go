@@ -26,7 +26,12 @@ func main() {
 		w.Add(1)
 		go func() {
 			for i := 0; i < 100; i++ {
-				fmt.Println(conn.Write([]byte("hello")))
+				_, err := conn.Write([]byte("hello"))
+
+				if err != nil {
+					w.Done()
+					return
+				}
 				time.Sleep(time.Second * 1)
 			}
 			w.Done()
