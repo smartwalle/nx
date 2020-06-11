@@ -23,23 +23,20 @@ func main() {
 	)
 
 	var c = make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(c, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
+
+MainLoop:
 	for {
 		s := <-c
 		switch s {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			fmt.Println(time.Now(), "等待任务结束...")
-			wg.Wait()
-			fmt.Println(time.Now(), "任务完成，程序关闭。")
-			return
-		case syscall.SIGHUP:
-		default:
-			fmt.Println(time.Now(), "等待任务结束...")
-			wg.Wait()
-			fmt.Println(time.Now(), "任务完成，程序关闭。")
-			return
+			break MainLoop
 		}
 	}
+
+	fmt.Println(time.Now(), "等待任务结束...")
+	wg.Wait()
+	fmt.Println(time.Now(), "任务完成，程序关闭。")
 }
 
 func newHandler() http.Handler {
