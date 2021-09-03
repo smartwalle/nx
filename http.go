@@ -21,7 +21,7 @@ var (
 
 type options struct {
 	restart func() error
-	wg      *sync.WaitGroup
+	waiter  Waiter
 }
 
 type option func(*options)
@@ -35,9 +35,9 @@ func WithRestartHandler(handler func() error) option {
 	}
 }
 
-func WithWait(w *sync.WaitGroup) option {
+func WithWaiter(w Waiter) option {
 	return func(opts *options) {
-		opts.wg = w
+		opts.waiter = w
 	}
 }
 
@@ -61,8 +61,8 @@ func NewHTTP(servers []*http.Server, opts ...option) *HTTP {
 	for _, opt := range opts {
 		opt(h.options)
 	}
-	if h.wg == nil {
-		h.wg = &sync.WaitGroup{}
+	if h.waiter == nil {
+		h.waiter = &sync.WaitGroup{}
 	}
 	return h
 }
@@ -88,15 +88,15 @@ func (h *HTTP) serve() {
 }
 
 func (h *HTTP) wait() {
-	h.wg.Add(len(h.servers))
+	h.waiter.Add(len(h.servers))
 	go h.signalHandler()
-	h.wg.Wait()
+	h.waiter.Wait()
 }
 
 func (h *HTTP) term() {
 	for _, s := range h.servers {
 		go func(s *http.Server) {
-			defer h.wg.Done()
+			defer h.waiter.Done()
 			if err := s.Shutdown(context.Background()); err != nil {
 				h.errors <- err
 			}

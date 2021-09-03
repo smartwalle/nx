@@ -15,7 +15,7 @@ func main() {
 	var wg = &sync.WaitGroup{}
 	go grace.ServeWithOptions(
 		[]*http.Server{{Addr: ":9900", Handler: newHandler()}},
-		grace.WithWait(wg),
+		grace.WithWaiter(wg),
 		grace.WithRestartHandler(func() error {
 			fmt.Println("Restart")
 			return nil

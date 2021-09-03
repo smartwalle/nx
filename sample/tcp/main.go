@@ -9,7 +9,7 @@ import (
 
 func main() {
 	var w = &sync.WaitGroup{}
-	var n = grace.NewNet(grace.WithWait(w))
+	var n = grace.NewNet(grace.WithWaiter(w))
 	ln, err := n.Listen("tcp", ":8891")
 	if err != nil {
 		fmt.Println(err)

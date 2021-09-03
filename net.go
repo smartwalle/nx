@@ -21,8 +21,8 @@ func NewNet(opts ...option) *Net {
 	for _, opt := range opts {
 		opt(n.options)
 	}
-	if n.wg == nil {
-		n.wg = &sync.WaitGroup{}
+	if n.waiter == nil {
+		n.waiter = &sync.WaitGroup{}
 	}
 	return n
 }
@@ -40,16 +40,16 @@ func (n *Net) ListenUnix(nett string, laddr *net.UnixAddr) (*net.UnixListener, e
 }
 
 func (n *Net) wait() {
-	n.wg.Add(len(n.net.ActiveListeners()))
+	n.waiter.Add(len(n.net.ActiveListeners()))
 	go n.signalHandler()
-	n.wg.Wait()
+	n.waiter.Wait()
 }
 
 func (n *Net) term() {
 	var lns = n.net.ActiveListeners()
 	for _, ln := range lns {
 		go func(ln net.Listener) {
-			defer n.wg.Done()
+			defer n.waiter.Done()
 			if err := ln.Close(); err != nil {
 				n.errChan <- err
 			}
